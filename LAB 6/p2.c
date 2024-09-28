@@ -1,182 +1,173 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// Define the structure SYMBOL
-struct SYMBOL {
+typedef struct node {
     char alphabet;
-    int frequency;
+    int freq;
+     struct node* left, *right;
+} SYMBOL;
+
+struct Tree {
+    unsigned size;
+    unsigned capacity;
+    SYMBOL **array;
 };
 
-// Define the structure for a node in the Huffman Tree
-struct HuffmanNode {
-    char alphabet;
-    int frequency;
-    struct HuffmanNode *left, *right;
-};
+SYMBOL* newnode(char alphabet, unsigned freq){
+    SYMBOL* temp = (SYMBOL*) malloc(sizeof(SYMBOL));
 
-// A structure for Min-Heap (Priority Queue)
-struct MinHeap {
-    int size;
-    int capacity;
-    struct HuffmanNode** array;
-};
+    if(temp == NULL){
+        printf("Error: Memory allocation failed.\n");
+        exit(1);
+    }
 
-// Create a new node for the Huffman Tree
-struct HuffmanNode* newNode(char alphabet, int frequency) {
-    struct HuffmanNode* temp = (struct HuffmanNode*)malloc(sizeof(struct HuffmanNode));
-    temp->alphabet = alphabet;
-    temp->frequency = frequency;
     temp->left = temp->right = NULL;
+    temp->alphabet = alphabet;
+    temp->freq = freq;
+
     return temp;
 }
 
-// Create a Min-Heap
-struct MinHeap* createMinHeap(int capacity) {
-    struct MinHeap* minHeap = (struct MinHeap*)malloc(sizeof(struct MinHeap));
+struct Tree* createMinHeap(unsigned cap){
+    struct Tree* minHeap = (struct Tree*)malloc(sizeof(struct Tree));
+
     minHeap->size = 0;
-    minHeap->capacity = capacity;
-    minHeap->array = (struct HuffmanNode**)malloc(minHeap->capacity * sizeof(struct HuffmanNode*));
+    minHeap->capacity = cap;
+    minHeap->array = (SYMBOL**)malloc(minHeap->capacity * sizeof(SYMBOL*));
+
     return minHeap;
 }
 
-// Swap two nodes in the heap
-void swapNodes(struct HuffmanNode** a, struct HuffmanNode** b) {
-    struct HuffmanNode* temp = *a;
+void swapSymbols(SYMBOL **a, SYMBOL **b){
+    SYMBOL* temp = *a;
     *a = *b;
     *b = temp;
 }
 
-// Heapify function to maintain the min-heap property
-void minHeapify(struct MinHeap* minHeap, int idx) {
+void minHeapify (struct Tree* minHeap, int idx) {
     int smallest = idx;
     int left = 2 * idx + 1;
     int right = 2 * idx + 2;
-
-    if (left < minHeap->size && minHeap->array[left]->frequency < minHeap->array[smallest]->frequency)
+    if(left < minHeap->size && minHeap->array[left]->freq < minHeap->array[smallest]->freq)
         smallest = left;
-
-    if (right < minHeap->size && minHeap->array[right]->frequency < minHeap->array[smallest]->frequency)
+    
+    if(right < minHeap->size && minHeap->array[right]->freq < minHeap->array[smallest]->freq)
         smallest = right;
+    
+    if(smallest != idx) {
+        swapSymbols(&minHeap->array[smallest], &minHeap->array[idx]);
 
-    if (smallest != idx) {
-        swapNodes(&minHeap->array[smallest], &minHeap->array[idx]);
         minHeapify(minHeap, smallest);
     }
 }
 
-// Check if the size of the heap is one
-int isSizeOne(struct MinHeap* minHeap) {
+int isSizeOne (struct Tree* minHeap) {
     return (minHeap->size == 1);
 }
 
-// Extract the node with minimum frequency
-struct HuffmanNode* extractMin(struct MinHeap* minHeap) {
-    struct HuffmanNode* temp = minHeap->array[0];
-    minHeap->array[0] = minHeap->array[minHeap->size - 1];
+SYMBOL * extractMin (struct Tree* minHeap){
+    SYMBOL* temp = minHeap->array[0];
+    minHeap->array[0] = minHeap->array[minHeap->size -1];
+
     minHeap->size--;
+
     minHeapify(minHeap, 0);
     return temp;
 }
 
-// Insert a new node into the min-heap
-void insertMinHeap(struct MinHeap* minHeap, struct HuffmanNode* node) {
-    minHeap->size++;
-    int i = minHeap->size - 1;
-    while (i && node->frequency < minHeap->array[(i - 1) / 2]->frequency) {
-        minHeap->array[i] = minHeap->array[(i - 1) / 2];
-        i = (i - 1) / 2;
+void insertMinHeap ( struct Tree* minHeap, SYMBOL* node) {
+    minHeap->size ++;
+    int i = minHeap->size -1;
+
+    while (i && node->freq < minHeap->array[(i-1)/2]->freq) {
+        minHeap->array[i] = minHeap->array[(i-1)/2];
+        i = (i-1)/2;
     }
     minHeap->array[i] = node;
 }
 
-// Build a min-heap
-void buildMinHeap(struct MinHeap* minHeap) {
-    int n = minHeap->size - 1;
-    for (int i = (n - 1) / 2; i >= 0; i--)
+void buildMinHeap ( struct Tree* minHeap) {
+    int n = minHeap->size-1;
+    for(int i = (n-1)/2; i>=0; --i) {
         minHeapify(minHeap, i);
+    }
 }
 
-// Create a min-heap of given capacity and insert all characters of SYMBOL array
-struct MinHeap* createAndBuildMinHeap(struct SYMBOL symbol[], int size) {
-    struct MinHeap* minHeap = createMinHeap(size);
-    for (int i = 0; i < size; ++i)
-        minHeap->array[i] = newNode(symbol[i].alphabet, symbol[i].frequency);
+int isLeaf(SYMBOL* root){
+    return !(root->left) && !(root->right);
+}
+
+struct Tree* createAndBuildMinHeap(char alphabet[], int freq[], int size) {
+    struct Tree* minHeap = createMinHeap(size);
+    for(int i=0; i<size; i++) {
+        minHeap->array[i] = newnode(alphabet[i], freq[i]);
+    }
+
     minHeap->size = size;
     buildMinHeap(minHeap);
+
     return minHeap;
 }
 
-// Build the Huffman Tree
-struct HuffmanNode* buildHuffmanTree(struct SYMBOL symbol[], int size) {
-    struct HuffmanNode *left, *right, *top;
+SYMBOL* buildHuffmanTree(char alphabet[], int freq[], int size) {
+    SYMBOL* left, *right, *top;
 
-    // Create a min-heap and insert all symbols
-    struct MinHeap* minHeap = createAndBuildMinHeap(symbol, size);
+    struct Tree* minHeap = createAndBuildMinHeap(alphabet, freq, size);
 
-    // Iterate while the size of the heap is greater than 1
-    while (!isSizeOne(minHeap)) {
-        // Extract two nodes with the minimum frequency
+    while(!isSizeOne(minHeap)){
         left = extractMin(minHeap);
         right = extractMin(minHeap);
 
-        // Create a new internal node with frequency equal to the sum of the two nodes' frequencies
-        top = newNode('$', left->frequency + right->frequency);
+        top = newnode ('$', left->freq + right->freq);
+
         top->left = left;
         top->right = right;
 
-        // Insert the new node into the min-heap
         insertMinHeap(minHeap, top);
     }
 
-    // The remaining node is the root of the Huffman tree
     return extractMin(minHeap);
 }
 
-// In-order traversal of the Huffman Tree
-void inOrderTraversal(struct HuffmanNode* root) {
-    if (root == NULL)
-        return;
+void printInorder(SYMBOL * root) {
+    if(root->left) {
+        printInorder(root->left);
+    }
 
-    // Traverse left subtree
-    inOrderTraversal(root->left);
+    if(root->right) {
+        printInorder(root->right);
+    }
 
-    // Print the character if it's a leaf node
-    if (root->alphabet != '$')
+    if(isLeaf(root)) {
         printf("%c ", root->alphabet);
-
-    // Traverse right subtree
-    inOrderTraversal(root->right);
+    }
 }
 
-int main() {
-    int n;
 
-    // Input number of distinct alphabets
-    printf("Enter the number of distinct alphabets: ");
+int main() {
+    int n, i;
+    printf ("Enter the number of distinct alphabets: ");
     scanf("%d", &n);
 
-    // Create an array of SYMBOL structures
-    struct SYMBOL symbols[n];
+    char alphabet[n];
+    int freq[n];
 
-    // Input the alphabets
-    printf("Enter the alphabets: ");
-    for (int i = 0; i < n; i++) {
-        scanf(" %c", &symbols[i].alphabet);
+    printf("Enter the alphabets : ");
+    for(i = 0; i< n; i++) {
+        scanf(" %c", &alphabet[i]);
     }
-
-    // Input the frequencies
     printf("Enter its frequencies: ");
-    for (int i = 0; i < n; i++) {
-        scanf("%d", &symbols[i].frequency);
+    for(i = 0; i<n; i++) {
+        scanf("%d", &freq[i]);
     }
 
-    // Build Huffman Tree
-    struct HuffmanNode* root = buildHuffmanTree(symbols, n);
+    SYMBOL *root = buildHuffmanTree(alphabet, freq, n);
 
-    // Perform in-order traversal of the Huffman tree
-    printf("In-order traversal of the tree (Huffman): ");
-    inOrderTraversal(root);
-    printf("\n");
+    printf("\nIn-order traversal of the tree (Huffman): ");
+    printInorder(root);
+
+    free(root);
 
     return 0;
+
 }
